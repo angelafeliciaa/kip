@@ -18,7 +18,10 @@ interface SupabaseProject {
 }
 
 function runSupabase(args: string): string {
-  return execSync(`supabase ${args}`, { encoding: "utf-8" }).trim();
+  return execSync(`supabase ${args}`, {
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
 }
 
 const supabaseProvider: Provider = {
