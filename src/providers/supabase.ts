@@ -1,10 +1,25 @@
 import crypto from "crypto";
+import { execSync } from "child_process";
 import { BrowserContext } from "playwright";
 import { Provider, ProviderOpts, ProvisionResult } from "../types.js";
 import { registry } from "./registry.js";
-import { waitForUser } from "../utils/notify.js";
 
-let createdProjectRef: string | null = null;
+interface SupabaseApiKey {
+  api_key: string;
+  name: string;
+  id: string;
+}
+
+interface SupabaseProject {
+  id: string;
+  name: string;
+  region: string;
+  organization_id: string;
+}
+
+function runSupabase(args: string): string {
+  return execSync(`supabase ${args}`, { encoding: "utf-8" }).trim();
+}
 
 const supabaseProvider: Provider = {
   name: "supabase",
@@ -25,399 +40,114 @@ const supabaseProvider: Provider = {
   },
 
   async provision(
-    context: BrowserContext,
+    _context: BrowserContext,
     opts: ProviderOpts
   ): Promise<ProvisionResult> {
-    const page = await context.newPage();
-    const projectName = opts.projectName || "autoprovision";
-
-    // Step 1: Navigate to Supabase dashboard projects
-    await page.goto("https://supabase.com/dashboard/projects");
-    await page.waitForLoadState("networkidle");
-
-    // Step 2: Check auth — if redirected to login, prompt user
-    if (!page.url().includes("/dashboard")) {
-      await waitForUser(
-        "Please log in to Supabase in the browser, then press Enter"
+    // Check supabase CLI is installed and authenticated
+    try {
+      runSupabase("projects list -o json");
+    } catch {
+      throw new Error(
+        "Supabase CLI not authenticated. Run 'supabase login' first."
       );
-      await page.goto("https://supabase.com/dashboard/projects");
-      await page.waitForLoadState("networkidle");
     }
 
-    // Step 3: Check for existing project matching projectName
-    let projectRef: string | null = null;
+    const projectName = opts.projectName || "autoprovision";
+    const region = (opts["region"] as string) || "us-west-1";
 
-    // Supabase dashboard is a React SPA — wait for project cards to render
-    await page
-      .waitForSelector('a[href*="/dashboard/project/"]', { timeout: 15_000 })
-      .catch(() => null);
+    // Check for existing project with matching name
+    const projectsJson = runSupabase("projects list -o json");
+    const projects: SupabaseProject[] = JSON.parse(projectsJson);
+    let project = projects.find((p) => p.name === projectName);
+    let dbPassword: string | undefined;
 
-    const projectLink = await page
-      .$(
-        `a[href*="/dashboard/project/"]:has-text("${projectName}")`
-      )
-      .catch(() => null);
-
-    if (projectLink) {
-      // Existing project found — click into it
-      const href = await projectLink.getAttribute("href");
-      const match = href?.match(/\/dashboard\/project\/([^/]+)/);
-      projectRef = match ? match[1] : null;
-      await projectLink.click();
-      await page.waitForLoadState("networkidle");
-      console.log(`Found existing Supabase project "${projectName}"`);
+    if (project) {
+      console.log(`[supabase] Found existing project "${projectName}" (${project.id})`);
     } else {
-      // Step 4: Create new project
-      console.log(`Creating new Supabase project "${projectName}"...`);
+      // Create new project
+      console.log(`[supabase] Creating project "${projectName}"...`);
+      dbPassword = crypto.randomBytes(24).toString("base64url");
 
-      // Selector may be fragile — Supabase may change button text
-      const newProjectBtn = await page
-        .waitForSelector(
-          'a:has-text("New Project"), button:has-text("New Project"), a:has-text("New project"), button:has-text("New project")',
-          { timeout: 10_000 }
-        )
-        .catch(() => null);
-
-      if (!newProjectBtn) {
-        throw new Error(
-          'Could not find "New Project" button. The Supabase dashboard UI may have changed.'
-        );
+      // Get first org ID
+      const orgId = projects[0]?.organization_id;
+      if (!orgId) {
+        throw new Error("No Supabase organization found. Create one at supabase.com/dashboard.");
       }
 
-      await newProjectBtn.click();
-      await page.waitForLoadState("networkidle");
-
-      // Select organization if prompted — use first available
-      // Selector may be fragile
-      const orgButton = await page
-        .$('button[class*="org"], [data-testid="org-select"] button, .org-button')
-        .catch(() => null);
-      if (orgButton) {
-        await orgButton.click();
-        // Pick first org in the dropdown
-        const firstOrg = await page
-          .waitForSelector('[role="option"], [role="menuitem"], li', {
-            timeout: 5_000,
-          })
-          .catch(() => null);
-        if (firstOrg) {
-          await firstOrg.click();
-        }
-      }
-
-      // Fill in project name
-      // Selector may be fragile — looks for project name input
-      const nameInput = await page.waitForSelector(
-        'input[id="project-name"], input[name="name"], input[placeholder*="project" i], input[placeholder*="name" i]',
-        { timeout: 10_000 }
+      const createOutput = runSupabase(
+        `projects create "${projectName}" --org-id ${orgId} --db-password "${dbPassword}" --region ${region} -o json`
       );
-      await nameInput.fill(projectName);
+      project = JSON.parse(createOutput);
 
-      // Generate a secure DB password
-      const dbPassword = crypto.randomBytes(24).toString("base64url");
-
-      // Fill in database password
-      // Selector may be fragile
-      const passwordInput = await page
-        .waitForSelector(
-          'input[id="db-password"], input[name="dbPass"], input[type="password"], input[placeholder*="password" i]',
-          { timeout: 10_000 }
-        )
-        .catch(() => null);
-
-      if (passwordInput) {
-        await passwordInput.fill(dbPassword);
-      }
-
-      // Select region if opts.region is specified — otherwise leave default
-      if (opts["region"]) {
-        // Selector may be fragile — region is typically a listbox/select
-        const regionSelect = await page
-          .$(
-            'button[id*="region"], [data-testid*="region"], button:has-text("Region")'
-          )
-          .catch(() => null);
-        if (regionSelect) {
-          await regionSelect.click();
-          const regionOption = await page
-            .waitForSelector(`[role="option"]:has-text("${opts["region"]}")`, {
-              timeout: 5_000,
-            })
-            .catch(() => null);
-          if (regionOption) {
-            await regionOption.click();
-          }
-        }
-      }
-
-      // Select free tier (Pricing plan) — click the free plan option if visible
-      // Selector may be fragile
-      const freePlanOption = await page
-        .$(
-          'button:has-text("Free"), label:has-text("Free"), [data-testid*="free"]'
-        )
-        .catch(() => null);
-      if (freePlanOption) {
-        await freePlanOption.click();
-      }
-
-      // Click "Create new project"
-      // Selector may be fragile
-      const createBtn = await page
-        .waitForSelector(
-          'button:has-text("Create new project"), button:has-text("Create project"), button[type="submit"]',
-          { timeout: 10_000 }
-        )
-        .catch(() => null);
-
-      if (!createBtn) {
-        throw new Error(
-          'Could not find "Create new project" button. The UI may have changed.'
-        );
-      }
-
-      await createBtn.click();
-
-      // Check for free tier limit error
-      const errorEl = await page
-        .waitForSelector(
-          'text=/free .* limit/i, text=/maximum .* project/i, [role="alert"]',
-          { timeout: 5_000 }
-        )
-        .catch(() => null);
-
-      if (errorEl) {
-        const errorText = await errorEl.textContent();
-        if (errorText?.toLowerCase().includes("limit") || errorText?.toLowerCase().includes("maximum")) {
-          throw new Error(
-            "Supabase free tier limited to 2 projects. Delete one at supabase.com/dashboard or upgrade."
-          );
-        }
-      }
-
-      // Wait for project to be ready — poll for up to 5 minutes
-      console.log(
-        "Waiting for Supabase project to be ready (this can take 1-3 minutes)..."
-      );
+      // Wait for project to be ready
+      console.log("[supabase] Waiting for project to be ready...");
       const startTime = Date.now();
       const timeoutMs = 5 * 60 * 1000;
 
       while (Date.now() - startTime < timeoutMs) {
-        // Extract the project ref from the URL
-        const urlMatch = page.url().match(/\/dashboard\/project\/([^/]+)/);
-        if (urlMatch) {
-          projectRef = urlMatch[1];
-          createdProjectRef = projectRef;
+        try {
+          // API keys become available once the project is ready
+          const keysJson = runSupabase(
+            `projects api-keys --project-ref ${project!.id} -o json`
+          );
+          const keys = JSON.parse(keysJson);
+          if (keys.length > 0) {
+            console.log("[supabase] Project ready!");
+            break;
+          }
+        } catch {
+          // Not ready yet
         }
-
-        // Check if the project dashboard has loaded (project is ready)
-        const readyIndicator = await page
-          .$(
-            '[class*="ProjectLayout"], [data-testid="project-layout"], nav a[href*="/editor"], a[href*="/sql"]'
-          )
-          .catch(() => null);
-
-        if (readyIndicator && projectRef) {
-          console.log("Project is ready!");
-          break;
-        }
-
         const elapsed = Math.round((Date.now() - startTime) / 1000);
         process.stdout.write(`\r  Provisioning... ${elapsed}s elapsed`);
-        await page.waitForTimeout(5_000);
+        await new Promise((r) => setTimeout(r, 5000));
       }
-
-      if (!projectRef) {
-        throw new Error(
-          "Project is taking too long. Check supabase.com/dashboard manually."
-        );
-      }
-
-      console.log(""); // newline after progress
+      console.log("");
     }
 
-    // Step 5: Extract API keys from Settings > API
-    const apiSettingsUrl = `https://supabase.com/dashboard/project/${projectRef}/settings/api`;
-    await page.goto(apiSettingsUrl);
-    await page.waitForLoadState("networkidle");
-    // SPA may take time to render
-    await page.waitForTimeout(3_000);
+    const ref = project!.id;
 
-    // Extract Project URL (SUPABASE_URL)
-    // Selector may be fragile — looks for the URL field
-    let supabaseUrl: string | null = null;
-    const urlInput = await page
-      .$(
-        'input[id*="url" i][readonly], input[value*="supabase.co"], span:has-text(".supabase.co"), code:has-text(".supabase.co")'
-      )
-      .catch(() => null);
+    // Get API keys
+    const keysJson = runSupabase(
+      `projects api-keys --project-ref ${ref} -o json`
+    );
+    const keys: SupabaseApiKey[] = JSON.parse(keysJson);
 
-    if (urlInput) {
-      const tag = await urlInput.evaluate((el) => el.tagName.toLowerCase());
-      supabaseUrl =
-        tag === "input"
-          ? await urlInput.inputValue()
-          : await urlInput.textContent();
-    }
+    const anonKey = keys.find((k) => k.name === "anon" || k.id === "anon");
+    const serviceKey = keys.find(
+      (k) => k.name === "service_role" || k.id === "service_role"
+    );
 
-    // Fallback: construct the URL from the project ref
-    if (!supabaseUrl) {
-      supabaseUrl = `https://${projectRef}.supabase.co`;
-    }
-
-    // Extract anon public key (SUPABASE_ANON_KEY)
-    // Selector may be fragile — the anon key is typically in a labeled section
-    let anonKey: string | null = null;
-    const pageContent = await page.content();
-
-    // Look for the anon key pattern (JWT-like token near "anon" text)
-    const anonSection = await page
-      .$(
-        'text=/anon.*public/i, text=/anon/i'
-      )
-      .catch(() => null);
-
-    if (anonSection) {
-      // Find the nearest input/code element containing the key
-      const anonContainer = await anonSection.evaluateHandle((el) => el.closest("div, tr, section") || el.parentElement);
-      const anonKeyEl = await anonContainer.asElement()?.$(
-        'input[readonly], code, span[class*="truncate"], input[type="text"]'
-      );
-      if (anonKeyEl) {
-        const tag = await anonKeyEl.evaluate((el) => el.tagName.toLowerCase());
-        anonKey =
-          tag === "input"
-            ? await anonKeyEl.inputValue()
-            : await anonKeyEl.textContent();
-      }
-    }
-
-    // Fallback: scan page content for JWT tokens (eyJ prefix)
-    if (!anonKey) {
-      const jwtMatches = pageContent.match(/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g);
-      if (jwtMatches && jwtMatches.length > 0) {
-        anonKey = jwtMatches[0];
-      }
-    }
-
-    // Extract service_role key (SUPABASE_SERVICE_ROLE_KEY) — may need to reveal it
-    let serviceRoleKey: string | null = null;
-
-    // Look for a "Reveal" button near service_role
-    // Selector may be fragile
-    const revealBtn = await page
-      .$(
-        'button:has-text("Reveal"), button:has-text("reveal"), button:has-text("Show")'
-      )
-      .catch(() => null);
-
-    if (revealBtn) {
-      await revealBtn.click();
-      await page.waitForTimeout(1_000);
-    }
-
-    const serviceSection = await page
-      .$(
-        'text=/service.role/i, text=/service_role/i'
-      )
-      .catch(() => null);
-
-    if (serviceSection) {
-      const serviceContainer = await serviceSection.evaluateHandle((el) => el.closest("div, tr, section") || el.parentElement);
-      const serviceKeyEl = await serviceContainer.asElement()?.$(
-        'input[readonly], code, span[class*="truncate"], input[type="text"]'
-      );
-      if (serviceKeyEl) {
-        const tag = await serviceKeyEl.evaluate((el) => el.tagName.toLowerCase());
-        serviceRoleKey =
-          tag === "input"
-            ? await serviceKeyEl.inputValue()
-            : await serviceKeyEl.textContent();
-      }
-    }
-
-    // Fallback: get second JWT from page (first is anon, second is service_role)
-    if (!serviceRoleKey) {
-      const updatedContent = await page.content();
-      const jwtMatches = updatedContent.match(
-        /eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g
-      );
-      if (jwtMatches && jwtMatches.length >= 2) {
-        serviceRoleKey = jwtMatches[1];
-      }
-    }
-
-    if (!anonKey || !serviceRoleKey) {
+    if (!anonKey || !serviceKey) {
       throw new Error(
-        "Could not extract API keys from Supabase settings page. The UI may have changed."
+        `Could not find API keys for project ${ref}. Keys found: ${keys.map((k) => k.name).join(", ")}`
       );
     }
 
-    // Step 6: Extract Database URL from Settings > Database
-    const dbSettingsUrl = `https://supabase.com/dashboard/project/${projectRef}/settings/database`;
-    await page.goto(dbSettingsUrl);
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(3_000);
-
-    let databaseUrl: string | null = null;
-
-    // Look for the connection string / URI
-    // Selector may be fragile
-    const connStringEl = await page
-      .$(
-        'input[value*="postgresql://"], code:has-text("postgresql://"), span:has-text("postgresql://"), input[value*="postgres://"], code:has-text("postgres://")'
-      )
-      .catch(() => null);
-
-    if (connStringEl) {
-      const tag = await connStringEl.evaluate((el) =>
-        el.tagName.toLowerCase()
-      );
-      databaseUrl =
-        tag === "input"
-          ? await connStringEl.inputValue()
-          : await connStringEl.textContent();
-    }
-
-    // Fallback: scan page for postgres connection string
-    if (!databaseUrl) {
-      const dbPageContent = await page.content();
-      const connMatch = dbPageContent.match(
-        /postgres(?:ql)?:\/\/[^\s"'<]+/
-      );
-      databaseUrl = connMatch ? connMatch[0] : null;
-    }
-
-    // Construct a fallback DATABASE_URL if we still don't have one
-    if (!databaseUrl) {
-      databaseUrl = `postgresql://postgres:[YOUR-PASSWORD]@db.${projectRef}.supabase.co:5432/postgres`;
-    }
-
-    await page.close();
+    const supabaseUrl = `https://${ref}.supabase.co`;
+    const databaseUrl = dbPassword
+      ? `postgresql://postgres.${ref}:${dbPassword}@aws-0-${region}.pooler.supabase.com:6543/postgres`
+      : `postgresql://postgres.${ref}:[YOUR-PASSWORD]@aws-0-${region}.pooler.supabase.com:6543/postgres`;
 
     return {
       vars: {
-        SUPABASE_URL: supabaseUrl.trim(),
-        SUPABASE_ANON_KEY: anonKey.trim(),
-        SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey.trim(),
-        DATABASE_URL: databaseUrl.trim(),
+        SUPABASE_URL: supabaseUrl,
+        SUPABASE_ANON_KEY: anonKey.api_key,
+        SUPABASE_SERVICE_ROLE_KEY: serviceKey.api_key,
+        DATABASE_URL: databaseUrl,
       },
       metadata: {
-        projectId: projectRef ?? undefined,
-        projectUrl: `https://supabase.com/dashboard/project/${projectRef}`,
-        dbPassword:
-          "Check your password manager or the value generated during provisioning",
+        projectId: ref,
+        projectUrl: `https://supabase.com/dashboard/project/${ref}`,
+        ...(dbPassword ? { dbPassword } : {}),
       },
     };
   },
 
   async rollback(_context: BrowserContext): Promise<void> {
-    if (createdProjectRef) {
-      console.warn(
-        `Warning: A Supabase project may have been partially created. ` +
-          `Check: https://supabase.com/dashboard/project/${createdProjectRef}`
-      );
-    }
+    console.warn(
+      "Note: If a project was partially created, check supabase.com/dashboard to clean up."
+    );
   },
 };
 
