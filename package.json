@@ -1,0 +1,25 @@
+{
+  "name": "kip",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "bin": {
+    "autoprovision": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@types/node": "^25.3.5",
+    "commander": "^14.0.3",
+    "dotenv": "^17.3.1",
+    "playwright": "^1.58.2",
+    "typescript": "^5.9.3"
+  }
+}
