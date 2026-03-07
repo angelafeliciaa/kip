@@ -36,5 +36,11 @@ src/
 ## Git
 Always follow the conventions in `.claude/rules/git.md` for branch names, commits, and PR titles.
 
+## Agentmail
+- Email verification is handled via the agentmail API (poll inbox programmatically)
+- NEVER open Gmail or any email client in the browser — always use the agentmail SDK to check for verification links
+- Each provider's Python agent script should poll `agentmail.inboxes.messages.list()` and extract links from the email body
+- Filter messages by sender/subject to avoid matching the wrong service's emails
+
 ## Testing browser flows
 Use `claude --chrome` to test with Claude Code's native Chrome integration.
