@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { BrowserContext } from "playwright";
 import { Provider, ProviderOpts, ProvisionResult } from "../types.js";
 import { registry } from "./registry.js";
@@ -17,8 +17,8 @@ interface SupabaseProject {
   organization_id: string;
 }
 
-function runSupabase(args: string): string {
-  return execSync(`supabase ${args}`, {
+function runSupabase(args: string[]): string {
+  return execFileSync("supabase", args, {
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
   }).trim();
@@ -48,7 +48,7 @@ const supabaseProvider: Provider = {
   ): Promise<ProvisionResult> {
     // Check supabase CLI is installed and authenticated
     try {
-      runSupabase("projects list -o json");
+      runSupabase(["projects", "list", "-o", "json"]);
     } catch {
       throw new Error(
         "Supabase CLI not authenticated. Run 'supabase login' first."
@@ -59,7 +59,7 @@ const supabaseProvider: Provider = {
     const region = (opts["region"] as string) || "us-west-1";
 
     // Check for existing project with matching name
-    const projectsJson = runSupabase("projects list -o json");
+    const projectsJson = runSupabase(["projects", "list", "-o", "json"]);
     const projects: SupabaseProject[] = JSON.parse(projectsJson);
     let project = projects.find((p) => p.name === projectName);
     let dbPassword: string | undefined;
@@ -77,9 +77,13 @@ const supabaseProvider: Provider = {
         throw new Error("No Supabase organization found. Create one at supabase.com/dashboard.");
       }
 
-      const createOutput = runSupabase(
-        `projects create "${projectName}" --org-id ${orgId} --db-password "${dbPassword}" --region ${region} -o json`
-      );
+      const createOutput = runSupabase([
+        "projects", "create", projectName,
+        "--org-id", orgId,
+        "--db-password", dbPassword,
+        "--region", region,
+        "-o", "json",
+      ]);
       project = JSON.parse(createOutput);
 
       // Wait for project to be ready
@@ -90,9 +94,9 @@ const supabaseProvider: Provider = {
       while (Date.now() - startTime < timeoutMs) {
         try {
           // API keys become available once the project is ready
-          const keysJson = runSupabase(
-            `projects api-keys --project-ref ${project!.id} -o json`
-          );
+          const keysJson = runSupabase([
+            "projects", "api-keys", "--project-ref", project!.id, "-o", "json",
+          ]);
           const keys = JSON.parse(keysJson);
           if (keys.length > 0) {
             console.log("[supabase] Project ready!");
@@ -111,9 +115,9 @@ const supabaseProvider: Provider = {
     const ref = project!.id;
 
     // Get API keys
-    const keysJson = runSupabase(
-      `projects api-keys --project-ref ${ref} -o json`
-    );
+    const keysJson = runSupabase([
+      "projects", "api-keys", "--project-ref", ref, "-o", "json",
+    ]);
     const keys: SupabaseApiKey[] = JSON.parse(keysJson);
 
     const anonKey = keys.find((k) => k.name === "anon" || k.id === "anon");

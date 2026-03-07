@@ -1,11 +1,12 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { createInterface } from "readline";
 
 export function notify(message: string): void {
   try {
-    execSync(
-      `osascript -e 'display notification "${message.replace(/"/g, '\\"')}" with title "Autoprovision"'`
-    );
+    execFileSync("osascript", [
+      "-e",
+      `display notification "${message.replace(/[\\"]/g, "")}" with title "Autoprovision"`,
+    ]);
   } catch {
     // Ignore notification failures
   }

@@ -35,22 +35,20 @@ export async function orchestrate(
     for (const name of providerNames) {
       const provider = registry.get(name)!;
 
-      // Detect existing keys
-      if (provider.detect(env) && !opts.force) {
-        console.log(`[${name}] Keys already exist, skipping (use --force to overwrite)`);
-        results.push({
-          provider: name,
-          keys: provider.requiredCredentials.map((k) => ({
-            name: k,
-            value: env[k] || "",
-          })),
-          status: "skipped",
-        });
-        continue;
-      }
-
-      // Validate existing keys
-      if (opts.validate && provider.validate) {
+      // Validate existing keys (check before detect so --validate always runs)
+      if (opts.validate) {
+        if (!provider.validate) {
+          console.log(`[${name}] No validation available, skipping`);
+          results.push({
+            provider: name,
+            keys: provider.requiredCredentials.map((k) => ({
+              name: k,
+              value: env[k] || "",
+            })),
+            status: "skipped",
+          });
+          continue;
+        }
         console.log(`[${name}] Validating existing keys...`);
         const valid = await provider.validate(env);
         console.log(`[${name}] Validation: ${valid ? "PASS" : "FAIL"}`);
@@ -61,6 +59,20 @@ export async function orchestrate(
             value: env[k] || "",
           })),
           status: valid ? "skipped" : "failed",
+        });
+        continue;
+      }
+
+      // Detect existing keys
+      if (provider.detect(env) && !opts.force) {
+        console.log(`[${name}] Keys already exist, skipping (use --force to overwrite)`);
+        results.push({
+          provider: name,
+          keys: provider.requiredCredentials.map((k) => ({
+            name: k,
+            value: env[k] || "",
+          })),
+          status: "skipped",
         });
         continue;
       }

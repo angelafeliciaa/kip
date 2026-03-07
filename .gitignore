@@ -3,3 +3,5 @@ dist
 .env
 .env.tmp
 *.js.map
+# Claude Code conversation exports (may contain secrets)
+202*-*.txt

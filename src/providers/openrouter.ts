@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import path from "path";
 import { BrowserContext } from "playwright";
 import { Provider, ProviderOpts, ProvisionResult } from "../types.js";
@@ -13,9 +13,11 @@ const openrouterProvider: Provider = {
   },
 
   async validate(env: Record<string, string>): Promise<boolean> {
+    const key = env["OPENROUTER_API_KEY"];
+    if (!key) return false;
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/models", {
-        headers: { Authorization: `Bearer ${env["OPENROUTER_API_KEY"]}` },
+      const res = await fetch("https://openrouter.ai/api/v1/auth/key", {
+        headers: { Authorization: `Bearer ${key}` },
       });
       return res.status === 200;
     } catch {
@@ -38,7 +40,7 @@ const openrouterProvider: Provider = {
     console.log("[openrouter] This will open Chrome — do NOT close it.");
 
     try {
-      const output = execSync(`"${pythonPath}" "${scriptPath}"`, {
+      const output = execFileSync(pythonPath, [scriptPath], {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 5 * 60 * 1000, // 5 minutes
