@@ -33,5 +33,8 @@ src/
 - Never overwrite existing .env keys without --force
 - Browser runs headed (visible) by default for user interaction
 
+## Git
+Always follow the conventions in `.claude/rules/git.md` for branch names, commits, and PR titles.
+
 ## Testing browser flows
 Use `claude --chrome` to test with Claude Code's native Chrome integration.
