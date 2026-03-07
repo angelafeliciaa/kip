@@ -170,6 +170,24 @@ Then add the import to `src/providers/index.ts`.
 - **AgentMail API key** — [console.agentmail.to](https://console.agentmail.to)
 - **Anthropic API key** — powers the AI browser agent
 
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. Fork the repo
+2. Create a branch (`git checkout -b my-feature`)
+3. Make your changes
+4. Run `npx tsc --noEmit` to type-check
+5. Commit and open a PR
+
+**Ideas for contributions:**
+- New providers (Vercel, Planetscale, Neon, Resend, etc.)
+- Better error handling for browser flows
+- Headless mode improvements
+- Tests
+
+If you want to add a provider, check out `src/providers/openrouter.ts` for an example and the [Adding a Provider](#adding-a-provider) section above.
+
 ## License
 
 [MIT](LICENSE)
