@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>kip — auto-provision cloud API keys</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    :root {
+      --bg: #0c0c0c;
+      --surface: #161616;
+      --border: #2a2a2a;
+      --text: #e0e0e0;
+      --text-dim: #888;
+      --accent: #c4956a;
+      --accent-light: #e8c9a0;
+      --green: #4ec970;
+      --red: #e05252;
+      --blue: #5b9cf5;
+    }
+
+    html { scroll-behavior: smooth }
+
+    body {
+      font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    a { color: var(--accent-light); text-decoration: none }
+    a:hover { text-decoration: underline }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(12,12,12,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .logo { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1.1rem; color: var(--accent-light) }
+    nav .logo svg { width: 28px; height: 22px }
+    nav .links { display: flex; gap: 1.5rem; font-size: .85rem }
+    nav .links a { color: var(--text-dim) }
+    nav .links a:hover { color: var(--text) }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 6rem 1.5rem 4rem;
+    }
+    .hero > svg { width: 140px; height: 110px; margin-bottom: 1.5rem }
+    .hero h1 { font-size: 3rem; font-weight: 800; letter-spacing: -.02em; color: var(--accent-light) }
+    .hero .tagline {
+      font-size: 1.15rem; color: var(--text-dim);
+      max-width: 540px; margin: 1rem auto 2rem;
+      line-height: 1.7;
+    }
+    .hero .tagline strong { color: var(--text) }
+    .cta-row { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center }
+    .btn {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .65rem 1.4rem;
+      border-radius: 6px;
+      font-size: .9rem;
+      font-family: inherit;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-primary { background: var(--accent); color: #0c0c0c; border-color: var(--accent) }
+    .btn-primary:hover { background: var(--accent-light); text-decoration: none }
+    .btn-ghost { background: transparent; color: var(--text) }
+    .btn-ghost:hover { background: var(--surface); text-decoration: none }
+
+    /* TERMINAL */
+    .terminal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-width: 620px;
+      width: 100%;
+      margin: 3rem auto 0;
+      overflow: hidden;
+      text-align: left;
+    }
+    .terminal-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 14px;
+      background: #1a1a1a;
+      border-bottom: 1px solid var(--border);
+    }
+    .terminal-dot { width: 10px; height: 10px; border-radius: 50% }
+    .terminal-body {
+      padding: 1rem 1.25rem;
+      font-size: .82rem;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+    .terminal-body .prompt { color: var(--green) }
+    .terminal-body .cmd { color: var(--text) }
+    .terminal-body .out { color: var(--text-dim) }
+    .terminal-body .key { color: var(--blue) }
+    .terminal-body .val { color: var(--accent-light) }
+    .terminal-body .ok { color: var(--green) }
+    .terminal-body .cursor {
+      display: inline-block; width: 8px; height: 15px;
+      background: var(--accent-light);
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+    }
+    @keyframes blink { 50% { opacity: 0 } }
+
+    /* SECTIONS */
+    section { padding: 5rem 1.5rem; max-width: 900px; margin: 0 auto }
+    section h2 {
+      font-size: 1.6rem; font-weight: 700; margin-bottom: .5rem;
+      color: var(--accent-light);
+    }
+    section .subtitle { color: var(--text-dim); margin-bottom: 2.5rem; font-size: .95rem }
+
+    /* PROVIDERS GRID */
+    .providers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .provider-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      transition: border-color .15s;
+    }
+    .provider-card:hover { border-color: var(--accent) }
+    .provider-card .provider-header { display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem }
+    .provider-card .provider-logo { width: 28px; height: 28px; flex-shrink: 0 }
+    .provider-card h3 { font-size: 1rem; margin-bottom: 0 }
+    .provider-card .keys { font-size: .78rem; color: var(--text-dim); line-height: 1.7 }
+    .provider-card .keys code {
+      background: rgba(196,149,106,.1);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--accent-light);
+      font-size: .75rem;
+    }
+    .provider-card .badge {
+      display: inline-block;
+      font-size: .65rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-left: .5rem;
+      vertical-align: middle;
+    }
+    .badge-cli { background: rgba(91,156,245,.15); color: var(--blue) }
+    .badge-browser { background: rgba(78,201,112,.15); color: var(--green) }
+
+    /* HOW IT WORKS */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1.25rem;
+    }
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(196,149,106,.15);
+      color: var(--accent);
+      font-size: .8rem;
+      font-weight: 700;
+      margin-bottom: .75rem;
+    }
+    .step h3 { font-size: .9rem; margin-bottom: .35rem }
+    .step p { font-size: .8rem; color: var(--text-dim); line-height: 1.6 }
+
+    /* QUICKSTART */
+    .quickstart-code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      font-size: .82rem;
+      line-height: 1.9;
+      overflow-x: auto;
+    }
+    .quickstart-code .comment { color: #555 }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      color: var(--text-dim);
+      font-size: .8rem;
+      border-top: 1px solid var(--border);
+    }
+
+    /* DIVIDER */
+    .divider {
+      max-width: 900px;
+      margin: 0 auto;
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 2.2rem }
+      .hero .tagline { font-size: 1rem }
+      nav .links { gap: 1rem }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 1 32 25" shape-rendering="crispEdges">
+      <rect x="5" y="2" width="2" height="2" fill="#c4956a"/>
+      <rect x="4" y="4" width="5" height="2" fill="#c4956a"/>
+      <rect x="5" y="4" width="3" height="2" fill="#e8c9a0"/>
+      <rect x="4" y="6" width="6" height="2" fill="#c4956a"/>
+      <rect x="5" y="6" width="4" height="2" fill="#e8c9a0"/>
+      <rect x="5" y="8" width="6" height="2" fill="#c4956a"/>
+      <rect x="6" y="8" width="4" height="2" fill="#e8c9a0"/>
+      <rect x="25" y="2" width="2" height="2" fill="#c4956a"/>
+      <rect x="23" y="4" width="5" height="2" fill="#c4956a"/>
+      <rect x="24" y="4" width="3" height="2" fill="#e8c9a0"/>
+      <rect x="22" y="6" width="6" height="2" fill="#c4956a"/>
+      <rect x="23" y="6" width="4" height="2" fill="#e8c9a0"/>
+      <rect x="21" y="8" width="6" height="2" fill="#c4956a"/>
+      <rect x="22" y="8" width="4" height="2" fill="#e8c9a0"/>
+      <rect x="8" y="9" width="16" height="2" fill="#c4956a"/>
+      <rect x="7" y="11" width="18" height="2" fill="#c4956a"/>
+      <rect x="7" y="13" width="18" height="2" fill="#c4956a"/>
+      <rect x="7" y="15" width="18" height="2" fill="#c4956a"/>
+      <rect x="7" y="17" width="18" height="2" fill="#c4956a"/>
+      <rect x="7" y="19" width="18" height="2" fill="#c4956a"/>
+      <rect x="8" y="21" width="16" height="2" fill="#c4956a"/>
+      <rect x="10" y="23" width="12" height="2" fill="#c4956a"/>
+      <rect x="11" y="17" width="10" height="2" fill="#e8c9a0"/>
+      <rect x="9" y="19" width="14" height="2" fill="#e8c9a0"/>
+      <rect x="10" y="21" width="12" height="2" fill="#e8c9a0"/>
+      <rect x="10" y="13" width="3" height="3" fill="#2b2b2b"/>
+      <rect x="19" y="13" width="3" height="3" fill="#2b2b2b"/>
+      <rect x="10" y="13" width="1" height="1" fill="#fff"/>
+      <rect x="19" y="13" width="1" height="1" fill="#fff"/>
+      <rect x="15" y="19" width="2" height="2" fill="#2b2b2b"/>
+      <rect x="13" y="22" width="1" height="1" fill="#2b2b2b"/>
+      <rect x="18" y="22" width="1" height="1" fill="#2b2b2b"/>
+      <rect x="8" y="17" width="2" height="2" fill="#e8a0a0" opacity="0.5"/>
+      <rect x="22" y="17" width="2" height="2" fill="#e8a0a0" opacity="0.5"/>
+    </svg>
+    kip
+  </div>
+  <div class="links">
+    <a href="#providers">Providers</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#quickstart">Quickstart</a>
+    <a href="https://github.com/angelafeliciaa/kip">GitHub</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 1 32 25" shape-rendering="crispEdges">
+    <rect x="5" y="2" width="2" height="2" fill="#c4956a"/>
+    <rect x="4" y="4" width="5" height="2" fill="#c4956a"/>
+    <rect x="5" y="4" width="3" height="2" fill="#e8c9a0"/>
+    <rect x="4" y="6" width="6" height="2" fill="#c4956a"/>
+    <rect x="5" y="6" width="4" height="2" fill="#e8c9a0"/>
+    <rect x="5" y="8" width="6" height="2" fill="#c4956a"/>
+    <rect x="6" y="8" width="4" height="2" fill="#e8c9a0"/>
+    <rect x="25" y="2" width="2" height="2" fill="#c4956a"/>
+    <rect x="23" y="4" width="5" height="2" fill="#c4956a"/>
+    <rect x="24" y="4" width="3" height="2" fill="#e8c9a0"/>
+    <rect x="22" y="6" width="6" height="2" fill="#c4956a"/>
+    <rect x="23" y="6" width="4" height="2" fill="#e8c9a0"/>
+    <rect x="21" y="8" width="6" height="2" fill="#c4956a"/>
+    <rect x="22" y="8" width="4" height="2" fill="#e8c9a0"/>
+    <rect x="8" y="9" width="16" height="2" fill="#c4956a"/>
+    <rect x="7" y="11" width="18" height="2" fill="#c4956a"/>
+    <rect x="7" y="13" width="18" height="2" fill="#c4956a"/>
+    <rect x="7" y="15" width="18" height="2" fill="#c4956a"/>
+    <rect x="7" y="17" width="18" height="2" fill="#c4956a"/>
+    <rect x="7" y="19" width="18" height="2" fill="#c4956a"/>
+    <rect x="8" y="21" width="16" height="2" fill="#c4956a"/>
+    <rect x="10" y="23" width="12" height="2" fill="#c4956a"/>
+    <rect x="11" y="17" width="10" height="2" fill="#e8c9a0"/>
+    <rect x="9" y="19" width="14" height="2" fill="#e8c9a0"/>
+    <rect x="10" y="21" width="12" height="2" fill="#e8c9a0"/>
+    <rect x="10" y="13" width="3" height="3" fill="#2b2b2b"/>
+    <rect x="19" y="13" width="3" height="3" fill="#2b2b2b"/>
+    <rect x="10" y="13" width="1" height="1" fill="#fff"/>
+    <rect x="19" y="13" width="1" height="1" fill="#fff"/>
+    <rect x="15" y="19" width="2" height="2" fill="#2b2b2b"/>
+    <rect x="13" y="22" width="1" height="1" fill="#2b2b2b"/>
+    <rect x="18" y="22" width="1" height="1" fill="#2b2b2b"/>
+    <rect x="8" y="17" width="2" height="2" fill="#e8a0a0" opacity="0.5"/>
+    <rect x="22" y="17" width="2" height="2" fill="#e8a0a0" opacity="0.5"/>
+  </svg>
+
+  <h1>kip</h1>
+  <p class="tagline">
+    <strong>Auto-provision cloud API keys</strong> so you don't have to.<br/>
+    Signs up, verifies emails, extracts keys, writes to <code>.env</code> — zero human-in-the-loop.
+  </p>
+
+  <div class="cta-row">
+    <a href="#quickstart" class="btn btn-primary">Get started</a>
+    <a href="https://github.com/angelafeliciaa/kip" class="btn btn-ghost">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="width:16px;height:16px;flex-shrink:0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <div class="terminal-dot" style="background:#ff5f57"></div>
+      <div class="terminal-dot" style="background:#febc2e"></div>
+      <div class="terminal-dot" style="background:#28c840"></div>
+    </div>
+    <div class="terminal-body">
+      <div><span class="prompt">$</span> <span class="cmd">npx kip openrouter supabase vercel</span></div>
+      <div class="out">&nbsp;</div>
+      <div class="out"><span class="ok">[openrouter]</span> Running browser-use agent...</div>
+      <div class="out"><span class="ok">[openrouter]</span> Signed up, verified email via AgentMail</div>
+      <div class="out"><span class="ok">[openrouter]</span> Got key: <span class="val">sk-or-v1-abc...x9z</span></div>
+      <div class="out"><span class="ok">[supabase]</span> Creating project "my-app"...</div>
+      <div class="out"><span class="ok">[supabase]</span> Project ready!</div>
+      <div class="out"><span class="ok">[vercel]</span> Found existing project "my-app"</div>
+      <div class="out"><span class="ok">[vercel]</span> Got token: <span class="val">vrcl_8f2k...m4n</span></div>
+      <div class="out">&nbsp;</div>
+      <div class="out">==================================================</div>
+      <div class="out"> Provider&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Key&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Status</div>
+      <div class="out">--------------------------------------------------</div>
+      <div class="out"> openrouter&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">OPENROUTER_API_KEY</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ok">written</span></div>
+      <div class="out"> supabase&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">SUPABASE_URL</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ok">written</span></div>
+      <div class="out"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">SUPABASE_ANON_KEY</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ok">written</span></div>
+      <div class="out"> vercel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">VERCEL_TOKEN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ok">written</span></div>
+      <div class="out"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">VERCEL_PROJECT_ID</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ok">written</span></div>
+      <div class="out">==================================================</div>
+      <div class="out">&nbsp;</div>
+      <div><span class="prompt">$</span> <span class="cursor"></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PROVIDERS -->
+<hr class="divider" />
+<section id="providers">
+  <h2>Providers</h2>
+  <p class="subtitle">Services kip can auto-provision. More coming soon.</p>
+
+  <div class="providers-grid">
+    <div class="provider-card">
+      <div class="provider-header">
+        <svg class="provider-logo" viewBox="-45 32 557 434" fill="#e0e0e0" stroke="#e0e0e0" xmlns="http://www.w3.org/2000/svg"><path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90" fill="none"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"/><path d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90" fill="none"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"/></svg>
+        <h3>OpenRouter <span class="badge badge-browser">browser</span></h3>
+      </div>
+      <div class="keys">
+        <code>OPENROUTER_API_KEY</code>
+      </div>
+    </div>
+    <div class="provider-card">
+      <div class="provider-header">
+        <svg class="provider-logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sb0" x1="53.97" y1="54.97" x2="94.16" y2="71.83" gradientUnits="userSpaceOnUse" gradientTransform="matrix(.572 0 0 .572 .986 -.121)"><stop stop-color="#249361"/><stop offset="1" stop-color="#3ECF8E"/></linearGradient></defs><path d="M37.412 62.937c-1.635 2.059-4.95.93-4.99-1.698L31.847 22.786h25.855c4.683 0 7.295 5.41 4.383 9.077z" fill="url(#sb0)"/><path d="M26.897 1.063c1.635-2.059 4.95-.931 4.99 1.698l.252 38.453H6.607c-4.683 0-7.295-5.41-4.383-9.077z" fill="#3ecf8e"/></svg>
+        <h3>Supabase <span class="badge badge-cli">CLI</span></h3>
+      </div>
+      <div class="keys">
+        <code>SUPABASE_URL</code><br/>
+        <code>SUPABASE_ANON_KEY</code><br/>
+        <code>SUPABASE_SERVICE_ROLE_KEY</code><br/>
+        <code>DATABASE_URL</code>
+      </div>
+    </div>
+    <div class="provider-card">
+      <div class="provider-header">
+        <svg class="provider-logo" viewBox="0 0 24 24" fill="#e0e0e0" xmlns="http://www.w3.org/2000/svg"><path d="M14.679 0c4.648 0 7.413 2.765 7.413 6.434s-2.765 6.434-7.413 6.434H12.33L24 24h-8.245l-8.88-8.44c-.636-.588-.93-1.273-.93-1.86 0-.831.587-1.565 1.713-1.883l4.574-1.224c1.737-.465 2.936-1.81 2.936-3.572 0-2.153-1.761-3.4-3.939-3.4H0V0z"/></svg>
+        <h3>Resend <span class="badge badge-browser">browser</span></h3>
+      </div>
+      <div class="keys">
+        <code>RESEND_API_KEY</code>
+      </div>
+    </div>
+    <div class="provider-card">
+      <div class="provider-header">
+        <svg class="provider-logo" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 7l8 14H6L14 7z" fill="#fff"/></svg>
+        <h3>Vercel <span class="badge badge-cli">CLI</span></h3>
+      </div>
+      <div class="keys">
+        <code>VERCEL_TOKEN</code><br/>
+        <code>VERCEL_ORG_ID</code><br/>
+        <code>VERCEL_PROJECT_ID</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<hr class="divider" />
+<section id="how-it-works">
+  <h2>How it works</h2>
+  <p class="subtitle">From zero to .env in one command.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>CLI</h3>
+      <p>Parse your command, resolve which providers to run, check for existing keys.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Orchestrate</h3>
+      <p>Launch a browser, run providers sequentially, track results and errors.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Provision</h3>
+      <p>Drive signup flows via Playwright or CLI tools. Handle CAPTCHAs, forms, dashboards.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <h3>Verify</h3>
+      <p>Receive verification emails via AgentMail and extract codes or links automatically.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <h3>Extract</h3>
+      <p>Grab API keys from dashboards, CLI output, or API responses.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <h3>Write</h3>
+      <p>Atomically write credentials to your <code>.env</code> file. Never overwrites existing keys.</p>
+    </div>
+  </div>
+</section>
+
+<!-- QUICKSTART -->
+<hr class="divider" />
+<section id="quickstart">
+  <h2>Quickstart</h2>
+  <p class="subtitle">Up and running in under a minute.</p>
+
+  <div class="quickstart-code">
+    <span class="comment"># Clone and install</span><br/>
+    <span class="prompt">$</span> git clone https://github.com/angelafeliciaa/kip && cd kip<br/>
+    <span class="prompt">$</span> npm install && npm run build<br/>
+    <br/>
+    <span class="comment"># Set your base credentials</span><br/>
+    <span class="prompt">$</span> cp .env.example .env<br/>
+    <span class="prompt">$</span> <span class="out"># fill in AGENTMAIL_API_KEY, AGENT_EMAIL, ANTHROPIC_API_KEY</span><br/>
+    <br/>
+    <span class="comment"># Provision services</span><br/>
+    <span class="prompt">$</span> node dist/index.js openrouter<br/>
+    <span class="prompt">$</span> node dist/index.js supabase vercel<br/>
+    <br/>
+    <span class="comment"># Validate existing keys</span><br/>
+    <span class="prompt">$</span> node dist/index.js openrouter --validate<br/>
+    <br/>
+    <span class="comment"># Dry run — see what would happen</span><br/>
+    <span class="prompt">$</span> node dist/index.js openrouter supabase --dry-run
+  </div>
+</section>
+
+<footer>
+  <p>MIT License &middot; Built with Playwright, AgentMail, and too much coffee.</p>
+</footer>
+
+</body>
+</html>
