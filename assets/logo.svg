@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128" shape-rendering="crispEdges">
+  <!-- Left ear -->
+  <rect x="5" y="2" width="2" height="2" fill="#c4956a"/>
+  <rect x="4" y="4" width="5" height="2" fill="#c4956a"/>
+  <rect x="5" y="4" width="3" height="2" fill="#e8c9a0"/>
+  <rect x="4" y="6" width="6" height="2" fill="#c4956a"/>
+  <rect x="5" y="6" width="4" height="2" fill="#e8c9a0"/>
+  <rect x="5" y="8" width="6" height="2" fill="#c4956a"/>
+  <rect x="6" y="8" width="4" height="2" fill="#e8c9a0"/>
+
+  <!-- Right ear -->
+  <rect x="25" y="2" width="2" height="2" fill="#c4956a"/>
+  <rect x="23" y="4" width="5" height="2" fill="#c4956a"/>
+  <rect x="24" y="4" width="3" height="2" fill="#e8c9a0"/>
+  <rect x="22" y="6" width="6" height="2" fill="#c4956a"/>
+  <rect x="23" y="6" width="4" height="2" fill="#e8c9a0"/>
+  <rect x="21" y="8" width="6" height="2" fill="#c4956a"/>
+  <rect x="22" y="8" width="4" height="2" fill="#e8c9a0"/>
+
+  <!-- Head -->
+  <rect x="8" y="9" width="16" height="2" fill="#c4956a"/>
+  <rect x="7" y="11" width="18" height="2" fill="#c4956a"/>
+  <rect x="7" y="13" width="18" height="2" fill="#c4956a"/>
+  <rect x="7" y="15" width="18" height="2" fill="#c4956a"/>
+  <rect x="7" y="17" width="18" height="2" fill="#c4956a"/>
+  <rect x="7" y="19" width="18" height="2" fill="#c4956a"/>
+  <rect x="8" y="21" width="16" height="2" fill="#c4956a"/>
+  <rect x="10" y="23" width="12" height="2" fill="#c4956a"/>
+
+  <!-- Face patch -->
+  <rect x="11" y="17" width="10" height="2" fill="#e8c9a0"/>
+  <rect x="9" y="19" width="14" height="2" fill="#e8c9a0"/>
+  <rect x="10" y="21" width="12" height="2" fill="#e8c9a0"/>
+
+  <!-- Eyes - 3x3, close -->
+  <rect x="10" y="13" width="3" height="3" fill="#2b2b2b"/>
+  <rect x="19" y="13" width="3" height="3" fill="#2b2b2b"/>
+  <rect x="10" y="13" width="1" height="1" fill="#fff"/>
+  <rect x="19" y="13" width="1" height="1" fill="#fff"/>
+
+  <!-- Nose -->
+  <rect x="15" y="19" width="2" height="2" fill="#2b2b2b"/>
+
+  <!-- Mouth -->
+  <rect x="13" y="22" width="1" height="1" fill="#2b2b2b"/>
+  <rect x="18" y="22" width="1" height="1" fill="#2b2b2b"/>
+
+  <!-- Cheek blush -->
+  <rect x="8" y="17" width="2" height="2" fill="#e8a0a0" opacity="0.5"/>
+  <rect x="22" y="17" width="2" height="2" fill="#e8a0a0" opacity="0.5"/>
+</svg>
