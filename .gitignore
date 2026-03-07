@@ -3,5 +3,8 @@ dist
 .env
 .env.tmp
 *.js.map
+# Landing page (deployed via Vercel API, not repo)
+site/
+vercel.json
 # Claude Code conversation exports (may contain secrets)
 202*-*.txt
