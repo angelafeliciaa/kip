@@ -1,12 +1,11 @@
-<p align="center">
-  <img src="assets/logo.svg" alt="Kip" width="160" />
-</p>
-
-<h1 align="center">kip</h1>
+<h1 align="center">
+  <img src="assets/logo.svg" alt="Kip" width="160" /><br/>
+  kip
+</h1>
 
 <p align="center">
   <strong>Auto-provision cloud API keys so you don't have to.</strong><br/>
-  Signs up, verifies emails, extracts keys, writes to .env. You do nothing.
+  Signs up, verifies emails, extracts keys, writes to .env without a human-in-the-loop.
 </p>
 
 <p align="center">
@@ -17,11 +16,15 @@
 
 ---
 
-## What is **kip**?
+## Why?
 
-**kip** is a CLI tool that uses **Playwright browser automation** and **AI agents** to provision cloud services and extract API keys automatically. Point it at a provider, and it handles the signup flow, email verification (via [AgentMail](https://agentmail.to)), and credential extraction — writing everything to your `.env`.
+<p align="center">
+  <img src="assets/why.png" alt="Jared Friedman tweet about developer tools not having signup APIs" width="300" />
+</p>
 
-Think of it as a coyote: resourceful, fast, gets things done while nobody's watching.
+Most developer tools still don't let you create an account via API. You have to open a browser, sign up, verify your email, click around a dashboard, and copy-paste an API key.
+
+kip fixes that. It's a browser agent that handles the entire signup flow — registration, email verification (via [AgentMail](https://agentmail.to)), and API key extraction, then writes the credentials straight to your `.env` file.
 
 ## Supported Providers
 
