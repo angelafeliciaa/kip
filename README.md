@@ -24,7 +24,7 @@
 
 Most developer tools still don't let you create an account via API. You have to open a browser, sign up, verify your email, click around a dashboard, and copy-paste an API key.
 
-kip fixes that. It's a browser agent that handles the entire signup flow — registration, email verification (via [AgentMail](https://agentmail.to)), and API key extraction, then writes the credentials straight to your `.env` file.
+**kip** fixes that. It's a browser agent that handles the entire signup flow — registration, email verification (via [AgentMail](https://agentmail.to)), and API key extraction, then writes the credentials straight to your `.env` file.
 
 ## Supported Providers
 
