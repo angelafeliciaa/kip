@@ -12,12 +12,21 @@ src/
   providers/
     registry.ts       # Provider registry (register/get/list)
     index.ts          # Auto-imports all providers
-    openrouter.ts     # OpenRouter API key provider
-    supabase.ts       # Supabase project + keys provider
+    openrouter.ts     # OpenRouter — AI model routing
+    supabase.ts       # Supabase — hosted Postgres + auth
+    resend.ts         # Resend — transactional email
+    vercel.ts         # Vercel — deployment platform
+    stripe.ts         # Stripe — payments
+    clerk.ts          # Clerk — authentication
+    upstash.ts        # Upstash — serverless Redis
+    neon.ts           # Neon — serverless Postgres
+    cloudflare.ts     # Cloudflare — Workers/CDN
   utils/
     env.ts            # .env read/write, gitignore check, key masking
     notify.ts         # macOS notifications + waitForUser
     summary.ts        # Pretty-print results table
+  auth/
+    agentmail.ts      # AgentMail SDK for email verification
 ```
 
 ## Commands
@@ -32,6 +41,7 @@ src/
 - .env writes are atomic (write .tmp, rename)
 - Never overwrite existing .env keys without --force
 - Browser runs headed (visible) by default for user interaction
+- Follow code style in `.claude/rules/code-style.md` for all TypeScript code
 
 ## Git
 Always follow the conventions in `.claude/rules/git.md` for branch names, commits, and PR titles.
