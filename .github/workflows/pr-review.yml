@@ -76,5 +76,5 @@ jobs:
             Use inline comments for specific code issues.
             Post a single summary comment with overall assessment at the end.
           claude_args: |
-            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr review:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Glob,Grep"
+            --allowedTools "Bash(gh:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Glob,Grep"
             --max-turns 50
