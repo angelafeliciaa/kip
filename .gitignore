@@ -8,3 +8,4 @@ site/
 vercel.json
 # Claude Code conversation exports (may contain secrets)
 202*-*.txt
+.omc*
