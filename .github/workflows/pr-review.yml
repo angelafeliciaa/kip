@@ -1,0 +1,80 @@
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          prompt: |
+            You are reviewing PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+
+            Read and enforce the project's CLAUDE.md and all .claude/rules/ files. Focus on:
+
+            1. TypeScript conventions (.claude/rules/code-style.md):
+               - Strict mode — all code must pass `npx tsc --noEmit`
+               - All imports at top of file — no inline/dynamic imports
+               - Import order: Node.js builtins → external packages → internal modules
+               - Use `.js` extensions in all relative imports (Node16 module resolution)
+               - Prefer `unknown` over `any` — if `any` is used, require a comment explaining why
+               - Use interfaces for public contracts (Provider, ProvisionResult), types for inline/union
+               - PascalCase for interfaces/types, camelCase for functions/variables, UPPER_SNAKE_CASE for env vars
+               - async/await with try/catch — no raw `.then()` chains
+
+            2. Provider pattern (.claude/rules/code-style.md):
+               - Every provider file: imports → helper functions → Provider object → self-registration
+               - Provider `name` must be lowercase kebab-case
+               - `requiredCredentials` lists all env var names the provider produces
+               - `detect()` checks if credentials already exist
+               - `provision()` receives a BrowserContext (prefix with `_` if unused)
+               - Log progress with `console.log("[provider-name] ...")` bracket prefix
+               - Mask keys in logs — only show first 8-12 chars
+               - Throw errors with actionable context (what failed, what to do)
+               - `rollback()` should warn, not attempt destructive operations
+               - Provisioning preference: REST API > CLI-based > browser automation
+
+            3. Security:
+               - No hardcoded API keys, tokens, or passwords in source code
+               - Credentials from env vars or local auth files only
+               - .env writes use atomic file operations (write .tmp, rename)
+               - .env files get mode 0o600
+               - .env must be in .gitignore
+
+            4. Error handling:
+               - Descriptive error messages: what failed + where to get missing credentials
+               - API helpers include status code and response body in errors
+               - Provider provision() cleans up partial state on failure when possible
+
+            5. Logging:
+               - console.log for progress, console.warn for non-fatal, console.error for errors only
+               - Never log full API keys, tokens, or passwords
+
+            6. Git conventions (.claude/rules/git.md):
+               - Commit format: `type(scope): subject` — lowercase, no period, 50 char max subject
+               - No Co-Authored-By trailers
+
+            7. General quality:
+               - No dead code or commented-out code left behind
+               - No security vulnerabilities (injection, exposed secrets)
+               - No unnecessary complexity or over-engineering
+
+            Use inline comments for specific code issues.
+            Post a single summary comment with overall assessment at the end.
+          claude_args: |
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr review:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Glob,Grep"
+            --max-turns 50
